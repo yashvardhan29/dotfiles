@@ -1,0 +1,25 @@
+#!/usr/local/bin/bash
+
+tmux_bin=/usr/local/bin/tmux
+
+PANES=$($tmux_bin list-panes -a -F '#S;#W;#{pane_current_command};[#I:#P];#T')
+
+if [[ ! -z $TMUX ]]; then
+   CURRENT=$($tmux_bin display-message -p "#I:#P")
+   PANES=$(echo "$PANES" | grep -v "$CURRENT")
+fi
+
+TARGET=$(
+  echo "$PANES" | column -t -s ";" \
+    | /usr/local/bin/fzf --exact --no-sort --select-1 --exit-0 --query="$1" --prompt="tmux > " --reverse
+) || exit 0
+
+TARGET_SESSION=$(echo "$TARGET" | cut -d " " -f1)
+TARGET_WINDOW=$(echo "$TARGET" | cut -d "[" -f2 | awk 'BEGIN{FS=":|-"} {print $1}')
+TARGET_PANE=$(echo "$TARGET" | cut -d "[" -f2 | awk 'BEGIN{FS=":|-"} {print $2}' | cut -c 1)
+
+if [ -z "$TMUX" ]; then
+  $tmux_bin attach-session -t "$TARGET_SESSION" \; select-pane -t "$TARGET_WINDOW.$TARGET_PANE"
+else
+ $tmux_bin switch-client -t "$TARGET_SESSION:$TARGET_WINDOW.$TARGET_PANE"
+fi
